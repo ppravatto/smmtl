@@ -46,11 +46,15 @@ namespace smmtl{
             Table(int nrows_, int ncols_, T* pdata_);
             Table(const Table<T>& source_);
             virtual ~Table();
+            
             Table<T>& operator= (const Table<T>& source_);
             Table<T> operator+ (const Table<T>& source_);
             Table<T> operator- (const Table<T>& source_);
             Table<T>& operator+= (const Table<T>& source_);
             Table<T>& operator-= (const Table<T>& source_);
+
+            void transpose();
+            Table<T> t();
 
             template <typename Variable>
                 friend std::ostream& operator<<(std::ostream &os, const Table<Variable> &source);
@@ -156,7 +160,30 @@ namespace smmtl{
         return *this;
     }
 
+    template <typename T>
+    void Table<T>::transpose(){
+        check_init();
+        T* buffer = new T [nrows*ncols];
+        for(int i=0; i<nrows*ncols; i++) buffer[i] = data[i];
+        for(int r=0; r<nrows; r++){
+            for(int c=0; c<ncols; c++){
+                data[r + nrows*c] = buffer[c + ncols*r];
+            }
+        }
+        int tmp = nrows;
+        nrows = ncols; ncols = tmp;
+    }
+
+    template <typename T>
+    Table<T> Table<T>::t(){
+        Table<T> copy = *this;
+        copy.transpose();
+        return copy;
+    }
+
+
     //Define operator << overload to print the Table content
+
     template <typename Variable>
     std::ostream& operator<<(std::ostream &os, const Table<Variable> &source) {
         if(source.init == false){
@@ -164,7 +191,7 @@ namespace smmtl{
         }
         else{
             for(int r=0; r<source.nrows; r++){
-                for(int c=0; c<source.nrows; c++){
+                for(int c=0; c<source.ncols; c++){
                     os << source.data[c + r*source.ncols] << '\t';
                 }
                 os << std::endl;
