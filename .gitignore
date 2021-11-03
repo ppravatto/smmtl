@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+# Local folders, files and executables used to development and testing
+.vscode

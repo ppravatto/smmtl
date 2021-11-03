@@ -445,7 +445,7 @@ namespace smmtl{
         for(int c=0; c<A.ncols; c++){
             Variable element = Variable(0.);
             for(int i=0; i<v.ncols; i++){
-                element += A(i, c)*v(i);
+                element += A.data[c + i*A.ncols]*v.data[i];
             }
             Result(c) = element;
         }
@@ -456,7 +456,7 @@ namespace smmtl{
     Variable operator* (const Vec<Variable>& A, const Vec<Variable>& B){
         A.verify_matrix_product(B);
         Variable result = Variable(0.);
-        for(int i=0; i<B.ncols; i++) result += A.data[i]*B.data[i];
+        for(int i=0; i<B.nrows; i++) result += A.data[i]*B.data[i];
         return result;
     }
 
@@ -485,6 +485,7 @@ namespace smmtl{
     template < typename Variable,
                typename Scalar,
                typename std::enable_if<!(std::is_base_of<Table<Variable>, Scalar>::value), Scalar>::type* >
+    
     Vec<Variable> operator*(const Vec<Variable> &Vector, Scalar scalar){
         Vector.check_init();
         Mat<Variable> Result(Vector.nrows, Vector.ncols);
@@ -495,6 +496,7 @@ namespace smmtl{
     template < typename Variable,
                typename Scalar,
                typename std::enable_if<!(std::is_base_of<Table<Variable>, Scalar>::value), Scalar>::type* >
+    
     Vec<Variable> operator*(Scalar scalar, const Vec<Variable> &Vector){
         return Vector*scalar;
     }
