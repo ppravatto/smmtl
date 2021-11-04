@@ -2,12 +2,13 @@
 #define SMMTL_H
 
 #include <iostream>
+#include <cmath>
 #include <string>
 #include <exception>
 
 namespace smmtl{
 
-    namespace _except_{
+    namespace exceptions{
 
         class BoundError: public std::exception {
             virtual const char* what() const throw(){
@@ -24,6 +25,18 @@ namespace smmtl{
         class ShapeError: public std::exception {
             virtual const char* what() const throw(){
                 return "Mismatch between the objects shape";
+            }
+        };
+
+        class OperationError: public std::exception {
+            virtual const char* what() const throw(){
+                return "The called function cannot be applied to the given object";
+            }
+        };
+
+        class ValueError: public std::exception {
+            virtual const char* what() const throw(){
+                return "Invalid parameter value encountered";
             }
         };
 
@@ -84,24 +97,24 @@ namespace smmtl{
 
     template <typename T>
     void Table<T>::check_limits(int row_, int col_) const {
-        if(row_<0 || row_>=nrows || col_<0 || col_>=ncols) throw _except_::BoundError();
+        if(row_<0 || row_>=nrows || col_<0 || col_>=ncols) throw exceptions::BoundError();
     }
 
     template <typename T>
     void Table<T>::check_init() const {
-        if(init==false) throw _except_::InitError();
+        if(init==false) throw exceptions::InitError();
     }
 
     template <typename T>
     void Table<T>::verify_elementwise_operation(const Table<T>& obj_) const {
         check_init(); obj_.check_init();
-        if(nrows != obj_.nrows || ncols != obj_.ncols) throw _except_::ShapeError();
+        if(nrows != obj_.nrows || ncols != obj_.ncols) throw exceptions::ShapeError();
     }
 
     template <typename T>
     void Table<T>::verify_matrix_product(const Table<T>& obj_) const {
         this->check_init(); obj_.check_init();
-        if(this->ncols != obj_.nrows) throw _except_::ShapeError();
+        if(this->ncols != obj_.nrows) throw exceptions::ShapeError();
     }
 
     template <typename T>
@@ -109,12 +122,14 @@ namespace smmtl{
 
     template <typename T>
     Table<T>::Table(int nrows_, int ncols_) : init(true), nrows(nrows_), ncols(ncols_){
+        if(this->nrows<=0 || this->ncols<=0) throw exceptions::ValueError();
         data = new T [nrows*ncols];
         for(int i=0; i<nrows_*ncols_; i++) data[i] = T(0);
     }
 
     template <typename T>
     Table<T>::Table(int nrows_, int ncols_, T* pdata_) : init(true), nrows(nrows_), ncols(ncols_){
+        if(this->nrows<=0 || this->ncols<=0) throw exceptions::ValueError();
         data = new T [nrows*ncols];
         for(int i=0; i<nrows_*ncols_; i++) data[i] = pdata_[i];
     }
@@ -231,6 +246,7 @@ namespace smmtl{
             
             Mat<T> t();
             bool is_square();
+            T trace();
 
             template <typename Variable>
                 friend Mat<Variable> operator* (const Mat<Variable>& A, const Mat<Variable>& B);
@@ -295,6 +311,7 @@ namespace smmtl{
 
     template <typename T>
     T& Mat<T>::operator() (int row_, int col_){
+        this->check_limits(row_, col_);
         return this->data[col_ + row_*this->ncols];
     }
 
@@ -310,9 +327,20 @@ namespace smmtl{
         return (this->nrows == this->ncols)? true : false;
     }
 
+    template <typename T>
+    T Mat<T>::trace(){
+        this->check_init();
+        if(is_square() == false) throw exceptions::OperationError();
+        T trace = T(0.);
+        for(int i=0; i<this->nrows; i++) trace += this->data[i+i*this->ncols];
+        return trace;
+    }
+
 
     template <typename T>
     class Vec : public Table<T>{
+        private:
+            void check_bounds(int index_) const;
         public:
             Vec();
             Vec(int nelements_);
@@ -329,6 +357,9 @@ namespace smmtl{
             T& operator() (int index_);
 
             Vec<T> t();
+            bool is_column();
+            T p_norm(double p_);
+            T norm();
 
             template <typename Variable>
                 friend Variable operator* (const Vec<Variable>& A, const Vec<Variable>& B);
@@ -347,6 +378,11 @@ namespace smmtl{
     };
 
     template <typename T>
+    void Vec<T>::check_bounds(int index_) const {
+        if(index_<0 || index_>(this->nrows * this->ncols)) throw exceptions::BoundError();
+    }
+
+    template <typename T>
     Vec<T>::Vec() : Table<T>() {}
 
     template <typename T>
@@ -360,7 +396,7 @@ namespace smmtl{
 
     template <typename T>
     Vec<T>::Vec(const Table<T>& source_) : Table<T>(source_) {
-        if(this->ncols != 1. && this->nrows != 1.) throw _except_::ShapeError();
+        if(this->ncols != 1. && this->nrows != 1.) throw exceptions::ShapeError();
     }
 
     template <typename T>
@@ -395,6 +431,7 @@ namespace smmtl{
 
     template <typename T>
     T& Vec<T>::operator() (int element_){
+        this->check_bounds(element_);
         return this->data[element_];
     }
 
@@ -403,7 +440,30 @@ namespace smmtl{
         Vec<T> Result(Table<T>::t());
         return Result;
     }
-    
+
+    template <typename T>
+    bool Vec<T>::is_column(){
+        this->check_init();
+        return (this->nrows == 1)? true : false;
+    }
+
+    template <typename T>
+    T Vec<T>::p_norm(double p_){
+        if(p_<1.) throw exceptions::ValueError();
+        this->check_init();
+        using std::abs;
+        T norm = T(0.);
+        for(int i=0; i<(this->ncols * this->nrows); i++){
+            norm += pow(abs(this->data[i]), p_);
+        }
+        return pow(norm, 1./p_);
+    }
+
+    template <typename T>
+    T Vec<T>::norm(){
+        return p_norm(2.);
+    }
+
 
     // Define matrix product operations between Mat and Vec classes
 
